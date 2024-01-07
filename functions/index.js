@@ -30,11 +30,13 @@ const db = getFirestore();
 const auth = getAuth();
 
 app.use(express.json());
-app.use(
-	cors({
-		origin: "https://www.google.com",
-	})
-);
+// app.use(
+// 	cors({
+// 		origin: "https://www.google.com",
+// 	})
+// );
+
+app.use(cors({ origin: true }));
 
 app.use(express.urlencoded({ extended: false }));
 
