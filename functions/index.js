@@ -1,81 +1,53 @@
 const express = require("express");
-const cors = require("cors");
 const { onRequest } = require("firebase-functions/v2/https");
-
 const { initializeApp, cert } = require("firebase-admin/app");
-const { getAuth } = require("firebase-admin/auth");
-const { getFirestore } = require("firebase-admin/firestore");
 const serviceAccount = require("./svcAccount.json");
+
+const cors = require("cors");
+const helmet = require("helmet");
+const cookieParser = require("cookie-parser");
 
 // Initialize Firebase App
 initializeApp({ credential: cert(serviceAccount) });
 
-// Initialize Firebase Auth and Firestore
-const auth = getAuth();
-const db = getFirestore();
+const apiRoutes = require("./routes");
+const { environment } = require("./config");
+
+const isProduction = environment === "production";
 
 const app = express();
 
 app.use(express.json());
 app.use(cors({ origin: true }));
 app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
+app.use(
+	helmet({
+		contentSecurityPolicy: false,
+	})
+);
 
-// app.get("/", async (req, res) => {
-// 	try {
-// 		// Perform Firestore operation to test
-// 		const querySnapshot = await getDocs(collection(db, "your_collection"));
-// 		querySnapshot.forEach((doc) => {
-// 			console.log(doc.id, "=>", doc.data());
-// 		});
+app.use("/api/v1", apiRoutes);
 
-// 		res.send("Testing hello world Relay backend!");
-// 	} catch (error) {
-// 		console.error("Error:", error);
-// 		res.status(500).send("Internal Server Error");
-// 	}
-// });
-
-app.get("/", async (req, res) => {
-	const userRef = db.collection("users");
-	const doc = await userRef.get();
-
-	if (!doc) {
-		console.log("No such document!");
-	} else {
-		console.log(doc);
-	}
-	res.send("Hello world!");
+// Catch unhandled requests and forward to error handler.
+app.use((_req, _res, next) => {
+	const err = new Error("The requested resource couldn't be found.");
+	err.title = "Resource Not Found";
+	err.errors = ["The requested resource couldn't be found."];
+	err.status = 404;
+	next(err);
 });
 
-app.post("/register", async (req, res) => {
-	const { email, password, phoneNumber } = req.body;
-
-	// TODO: SET UP PASSWORD COMPLEXITY CHECK
-
-	try {
-		const userRecord = await auth.createUser({
-			email,
-			password,
-			phoneNumber,
-		});
-
-		if (userRecord) {
-			const response = await db
-				.collection("users")
-				.doc(userRecord.uid)
-				.set({
-					email,
-				});
-
-			console.log(response, "db response");
-			res.send(`User record created with UID: ${userRecord.uid}`);
-		}
-	} catch (err) {
-		console.log("Error: ", err);
-		res.status(500).json({
-			error: err.message,
-		});
-	}
+// Error formatter
+app.use((err, _req, res, _next) => {
+	res.status(err.status || 500);
+	console.error(err);
+	res.json({
+		title: err.title || "Server Error",
+		message: err.message,
+		errors: err.errors,
+		stack: isProduction ? null : err.stack,
+	});
 });
 
 exports.app = onRequest(app);
