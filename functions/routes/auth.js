@@ -1,3 +1,4 @@
+const axios = require("axios");
 const express = require("express");
 const asyncHandler = require("express-async-handler");
 const { getAuth } = require("firebase-admin/auth");
@@ -6,6 +7,8 @@ const router = express.Router();
 
 const auth = getAuth();
 const db = getFirestore();
+
+const FIREBASE_API_KEY = process.env.FB_WEB_API_KEY;
 
 router.get("/test", async (req, res) => {
 	const userRef = db.collection("users");
@@ -18,6 +21,38 @@ router.get("/test", async (req, res) => {
 	}
 	res.send("Hello world!");
 });
+
+router.post(
+	"/login",
+	asyncHandler(async (req, res) => {
+		const { email, password } = req.body;
+
+		try {
+			const userRecord = await auth.getUserByEmail(email);
+
+			console.log(userRecord, "response from get user by email \n\n\n\n");
+
+			const response = await axios.post(
+				`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
+				{ email, password, returnSecureToken: true }
+			);
+
+			if (response?.data) {
+				res.json(response.data);
+			} else {
+				throw new Error("No or invalid response from Firebase.");
+			}
+		} catch (err) {
+			const { data, status } = err.response || {};
+			res.status(status || 500).json({
+				error:
+					data?.error?.message ||
+					"Internal Server Error (Login route)",
+			});
+			console.log(`Unhandled Error: ${err}`);
+		}
+	})
+);
 
 router.post(
 	"/register",
