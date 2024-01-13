@@ -3,6 +3,7 @@ const { onRequest } = require("firebase-functions/v2/https");
 const { initializeApp, cert } = require("firebase-admin/app");
 const serviceAccount = require("./svcAccount.json");
 
+const csrf = require("csurf");
 const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
@@ -21,6 +22,7 @@ app.use(express.json());
 app.use(cors({ origin: true }));
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
+app.use(csrf({ cookie: true }));
 app.use(
 	helmet({
 		contentSecurityPolicy: false,
