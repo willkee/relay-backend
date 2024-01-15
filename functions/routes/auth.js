@@ -23,6 +23,26 @@ router.get("/reload", async (req, res) => {
 });
 
 router.post(
+	"/idToken",
+	asyncHandler(async (req, res) => {
+		const { idToken } = req.body;
+
+		const {
+			name: displayName,
+			email,
+			uid,
+		} = await auth.verifyIdToken(idToken);
+
+		if (!email) throw new Error("Invalid ID token.");
+
+		// 1 hour in milliseconds = 3600000
+		const options = { maxAge: 3600000, httpOnly: true, secure: true };
+		res.cookie("id_token", idToken, options);
+		res.json({ displayName, email, uid });
+	})
+);
+
+router.post(
 	"/sessionLogin",
 	asyncHandler(async (req, res) => {
 		const { idToken, xsrfToken } = req.body;
@@ -45,48 +65,37 @@ router.post(
 );
 
 router.post(
-	"/idToken",
-	asyncHandler(async (req, res) => {
-		const { idToken } = req.body;
-		// await auth.verifyIdToken(idToken);
-
-		// 1 hour in milliseconds = 3600000
-		const options = { maxAge: 3600000, httpOnly: true, secure: true };
-		res.cookie("id_token", idToken, options);
-		res.json({ success: true });
-	})
-);
-
-router.post(
 	"/login",
 	asyncHandler(async (req, res) => {
 		const { email, password } = req.body;
 
-		try {
-			const userRecord = await auth.getUserByEmail(email);
+		const userRecord = await auth.getUserByEmail(email);
 
-			console.log(userRecord, "response from get user by email \n\n\n\n");
+		if (!userRecord || userRecord.disabled)
+			throw new Error("User does not exist or has been disabled.");
 
-			const response = await axios.post(
-				`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
-				{ email, password, returnSecureToken: true }
-			);
-			console.log(response, "login response");
+		const response = await axios.post(
+			`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
+			{ email, password, returnSecureToken: true }
+		);
 
-			if (response?.data) {
-				res.json(response.data);
-			} else {
-				throw new Error("No or invalid response from Firebase.");
-			}
-		} catch (err) {
-			const { data, status } = err.response || {};
-			res.status(status || 500).json({
-				error:
-					data?.error?.message ||
-					"Internal Server Error (Login route)",
-			});
-			console.log(`Unhandled Error: ${err}`);
-		}
+		const id = response.data.idToken;
+		// Set session expiration to 5 days.
+		const expiresIn = 60 * 60 * 24 * 5 * 1000;
+
+		const sessionCookie = await auth.createSessionCookie(id, { expiresIn });
+		const options = { maxAge: expiresIn, httpOnly: true, secure: true };
+
+		console.log(userRecord, "userRecord");
+
+		res.cookie("id_token", id, options);
+		res.cookie("session", sessionCookie, options);
+		res.json({
+			email: userRecord.email,
+			uid: userRecord.uid,
+			displayName: userRecord.displayName,
+			phoneNumber: userRecord.phoneNumber,
+		});
 	})
 );
 
@@ -95,7 +104,7 @@ router.post(
 	asyncHandler(async (req, res) => {
 		const { email, password, displayName, username, dob } = req.body;
 
-		console.log(req.body, "req.body");
+		console.log(dob, "DOB");
 
 		try {
 			const userRecord = await auth.createUser({
@@ -106,11 +115,16 @@ router.post(
 
 			if (userRecord) {
 				const uid = userRecord.uid;
-				await db.collection("users").doc(uid).set({ email, username });
+				await db
+					.collection("users")
+					.doc(uid)
+					.set({
+						email,
+						username,
+						displayName,
+						dateOfBirth: new Date(dob.year, dob.month - 1, dob.day),
+					});
 				const token = await auth.createCustomToken(uid);
-
-				console.log(token, "token");
-
 				res.json({ uid, email: userRecord.email, token });
 			}
 		} catch (err) {
