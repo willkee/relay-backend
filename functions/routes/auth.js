@@ -16,12 +16,19 @@ router.post(
 
 		if (!uid) throw new Error("Error in creating user.");
 
-		const dateOfBirth = new Date(dob.year, dob.month - 1, dob.day);
+		const dateOfBirth = new Date(
+			Date.UTC(dob.year, dob.month - 1, dob.day)
+		);
 
 		await db
 			.collection("users")
 			.doc(uid)
-			.set({ email, username, displayName, dateOfBirth });
+			.set({
+				email,
+				username,
+				displayName,
+				dateOfBirth: dateOfBirth.toISOString().split("T")[0],
+			});
 
 		res.json({ success: true });
 	})
