@@ -11,3 +11,4 @@ node_modules/
 svcAccount.json
 
 .env
+.DS_Store
