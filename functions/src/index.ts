@@ -18,8 +18,8 @@ const isProduction = environment === "production";
 
 const app = express();
 
-app.use(express.json());
 app.use(cors({ origin: true }));
+app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser() as any);
 app.use(csrf({ cookie: true }) as any);
