@@ -1,11 +1,12 @@
 import express, { Request, Response, NextFunction } from "express";
 import csrf from "csurf";
 import cors from "cors";
-import helmet from "helmet";
 import cookieParser from "cookie-parser";
-
+import morgan from "morgan";
 import serviceAccount from "./svcAccount.json";
 import { initializeApp, cert } from "firebase-admin/app";
+
+import { csrfProtection } from "./utils/middleware";
 
 initializeApp({ credential: cert(serviceAccount as any) });
 import { onRequest } from "firebase-functions/v2/https";
@@ -18,16 +19,31 @@ const isProduction = environment === "production";
 
 const app = express();
 
-app.use(cors({ origin: true }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser() as any);
-app.use(csrf({ cookie: true }) as any);
+app.use(cookieParser());
+
+if (isProduction) app.use(cors({ origin: ["http://localhost:5173"] }));
+
 app.use(
-	helmet({
-		contentSecurityPolicy: false,
+	csrf({
+		cookie: {
+			secure: isProduction,
+			sameSite: isProduction && "lax",
+			httpOnly: true,
+		},
 	})
 );
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+app.use(morgan("dev"));
+
+app.use((req, res, next) => {
+	csrfProtection(req, res, () => {
+		console.log("CSRF token (expected):", req.csrfToken()); // Logs expected token
+		console.log("REQUEST OBJECT \n\n\n:", req.cookies, "\n\n\n"); // Replace <CSRF_COOKIE_NAME> with your cookie's name
+		next();
+	});
+});
 
 app.get("/test", (_req: Request, res: Response) => {
 	res.json({ message: "Hello from server!" });
