@@ -4,7 +4,6 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
 import createAssessment from "../utils/useRecaptcha";
-import { csrfProtection } from "../utils/middleware";
 const router = express.Router();
 
 const auth = getAuth();
@@ -12,7 +11,6 @@ const db = getFirestore();
 
 router.post(
 	"/register",
-	csrfProtection,
 	asyncHandler(async (req: Request, res: Response) => {
 		const { email, password, displayName, username, dob, token } = req.body;
 

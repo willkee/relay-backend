@@ -1,12 +1,11 @@
 import express, { Request, Response, NextFunction } from "express";
-import csrf from "csurf";
+import csurf from "csurf";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import morgan from "morgan";
+// import morgan from "morgan";
 import serviceAccount from "./svcAccount.json";
 import { initializeApp, cert } from "firebase-admin/app";
-
-import { csrfProtection } from "./utils/middleware";
+import { info } from "firebase-functions/logger";
 
 initializeApp({ credential: cert(serviceAccount as any) });
 import { onRequest } from "firebase-functions/v2/https";
@@ -19,31 +18,27 @@ const isProduction = environment === "production";
 
 const app = express();
 
-app.use(cookieParser());
-
-if (isProduction) app.use(cors({ origin: ["http://localhost:5173"] }));
-
-app.use(
-	csrf({
-		cookie: {
-			secure: isProduction,
-			sameSite: isProduction && "lax",
-			httpOnly: true,
-		},
-	})
-);
+// app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
 
-app.use(morgan("dev"));
+info("Current environment is: ", environment);
 
-app.use((req, res, next) => {
+if (isProduction) {
+	app.use(cors({ origin: true, credentials: true }));
+}
+
+// Initialize csurf middleware with cookie option
+const csrfProtection = csurf({ cookie: true });
+
+// Custom middleware to log CSRF cookie and then apply CSRF protection
+app.use((req, res, next) =>
 	csrfProtection(req, res, () => {
-		console.log("CSRF token (expected):", req.csrfToken()); // Logs expected token
-		console.log("REQUEST OBJECT \n\n\n:", req.cookies, "\n\n\n"); // Replace <CSRF_COOKIE_NAME> with your cookie's name
+		// debug(req.csrfToken(), req.headers, "TOKEN LOGGING");
 		next();
-	});
-});
+	})
+);
 
 app.get("/test", (_req: Request, res: Response) => {
 	res.json({ message: "Hello from server!" });
