@@ -4,7 +4,6 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
 import createAssessment from "../utils/useRecaptcha";
-
 const router = express.Router();
 
 const auth = getAuth();
@@ -38,6 +37,12 @@ router.post(
 			Date.UTC(dob.year, dob.month - 1, dob.day)
 		);
 
+		const badges = {
+			staff: false,
+			dev: false,
+			bug_hunter: false,
+		};
+
 		await db
 			.collection("users")
 			.doc(uid)
@@ -45,6 +50,9 @@ router.post(
 				email,
 				username,
 				displayName,
+				friends: [],
+				badges,
+				avatar: "default_1",
 				dateOfBirth: dateOfBirth.toISOString().split("T")[0],
 			});
 

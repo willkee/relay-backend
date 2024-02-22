@@ -1,11 +1,11 @@
 import express, { Request, Response, NextFunction } from "express";
-import csrf from "csurf";
+import csurf from "csurf";
 import cors from "cors";
-import helmet from "helmet";
 import cookieParser from "cookie-parser";
-
+// import morgan from "morgan";
 import serviceAccount from "./svcAccount.json";
 import { initializeApp, cert } from "firebase-admin/app";
+import { info } from "firebase-functions/logger";
 
 initializeApp({ credential: cert(serviceAccount as any) });
 import { onRequest } from "firebase-functions/v2/https";
@@ -18,14 +18,25 @@ const isProduction = environment === "production";
 
 const app = express();
 
+// app.use(morgan("dev"));
 app.use(express.json());
-app.use(cors({ origin: true }));
 app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser() as any);
-app.use(csrf({ cookie: true }) as any);
-app.use(
-	helmet({
-		contentSecurityPolicy: false,
+app.use(cookieParser());
+
+info("Current environment is: ", environment);
+
+if (isProduction) {
+	app.use(cors({ origin: true, credentials: true }));
+}
+
+// Initialize csurf middleware with cookie option
+const csrfProtection = csurf({ cookie: true });
+
+// Custom middleware to log CSRF cookie and then apply CSRF protection
+app.use((req, res, next) =>
+	csrfProtection(req, res, () => {
+		// debug(req.csrfToken(), req.headers, "TOKEN LOGGING");
+		next();
 	})
 );
 

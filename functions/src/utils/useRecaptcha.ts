@@ -21,13 +21,6 @@ async function createAssessment({
 	token: string;
 	recaptchaAction?: string;
 }) {
-	console.log(
-		projectID,
-		recaptchaKey,
-		token,
-		recaptchaAction,
-		"createAssessment params"
-	);
 	// Create the reCAPTCHA client.
 	if (!cachedClient) {
 		cachedClient = new RecaptchaEnterpriseServiceClient();

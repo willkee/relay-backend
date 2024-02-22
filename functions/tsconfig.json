@@ -11,5 +11,5 @@
 		"resolveJsonModule": true
 	},
 	"compileOnSave": true,
-	"include": ["src/**/*", "types.d.ts", "assets/index.ts"]
+	"include": ["src", "src/**/*", "types.d.ts", "assets/index.ts"]
 }

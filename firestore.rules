@@ -1,9 +1,57 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+
+    // Match any document in the 'users' collection
+    match /users/{userId} {
+      // Allow read/write access only if the request is made by an authenticated user whose ID matches the document ID
+      allow read, write: if request.auth.uid == userId;
     }
+
+    // Match documents in the 'userServers' collection
+    match /userServers/{userId} {
+      // Allow read access only if the request is made by an authenticated user whose ID matches the document ID
+      // This ensures a user can only query their own list of servers
+      allow read: if request.auth.uid == userId;
+
+      // Assuming you want to allow users to update their own server lists (join/leave operations), grant write access accordingly
+      allow write: if request.auth.uid == userId;
+    }
+
+    // Match any document in the 'servers' collection
+    match /servers/{serverId} {
+      // Allow read access to all users for server details
+      allow read: if true; // Consider more restrictive rules based on your application's needs
+
+      // For more granular control, you might restrict write access to server admins or owners
+      // This example assumes a simplified model where only authenticated users can create servers
+      allow write: if request.auth.uid != null;
+    }
+
+    // Match any document in the 'channels' collection
+    match /channels {
+      // Allow read access to all users for channel details
+      allow read, write: if true
+    }
+
+    // Match any document in the 'channels' collection
+    match /channels/{channelId} {
+      // Allow read access to all users for channel details
+      allow read, write: if isMemberOfServer(request.auth.uid, resource.data.serverId);
+    }
+
+    // Match any document in the 'messages' collection
+    match /messages/{messageId} {
+      // Allow read access to all users for channel details
+      allow read, write: if isMemberOfServer(request.auth.uid, resource.data.serverId);
+    }
+
+    // Helper function to check if a user is a member of the server
+    function isMemberOfServer(userId, serverId) {
+      // Access the server document to check if the user is in the 'members' map
+
+      let serverDoc = get(/databases/$(database)/documents/servers/$(serverId));
+      return serverDoc.data.members[userId] != null;
+      }
   }
 }
